@@ -1,70 +1,68 @@
-# Zaamaar-architecture-diagrams
 # Monolithic Single-Tier AWS Architecture
 
-A highly available, scalable **single-tier monolithic** web application deployed on AWS using a single VPC across multiple Availability Zones.
+A simple, highly available **single-tier monolithic** web application design on AWS.
 
-This design is ideal for:
-- Simple web apps or MVPs where all logic (UI, business rules, data access) lives in one codebase/deployable unit.
-- Learning AWS fundamentals (VPC, EC2 Auto Scaling, Load Balancing, multi-AZ HA).
-- Small-to-medium traffic workloads before evolving to microservices or multi-tier.
+This architecture runs the entire application (frontend + backend logic + any local data handling) on EC2 instances behind a load balancer, all within one VPC across multiple Availability Zones. Ideal for prototypes, small apps, learning AWS, or workloads that don't yet need separation of concerns.
 
-![Monolithic Single-Tier AWS Design](monolithic-single-tier-design.drawio.svg)
+![Monolithic Single-Tier Design](Monolithic%20single%20tier%20design.drawio.svg)
 
-*(Click the image above to zoom — vector format for crisp details. Edit in diagrams.net/draw.io by opening the file directly from this repo.)*
+*(Vector SVG with embedded diagram data — zoomable on GitHub. Edit directly in diagrams.net by opening this file from the repo via File → Open → GitHub.)*
 
-## Architecture Overview
+## Core Components
 
-- **Region**: us-east-1
-- **VPC**: Single VPC spanning multiple AZs (us-east-1a & us-east-1b) for high availability
-- **Internet Gateway**: Provides public internet access
-- **Public Subnets** (one per AZ): Host the Application Load Balancer (ALB)
-- **Auto Scaling Group (ASG)**: Launches EC2 instances running the monolithic app (e.g., Node.js, Python Flask/Django, Java Spring, PHP, etc.)
-  - Instances placed in **public subnets** (simple setup; for production, move to private subnets + NAT)
-  - Scaling based on CPU/metrics or scheduled
-- **Application Load Balancer (ALB)**: Distributes traffic across AZs, performs health checks, terminates HTTPS (via ACM cert)
-- **Security Groups**: Least-privilege rules (ALB allows 80/443 from anywhere; instances allow app port only from ALB)
-- **Other assumed components** (not shown but recommended):
-  - Route 53 for DNS
-  - CloudWatch for monitoring & alarms
-  - Optional: CloudFront CDN for static assets
+- **AWS Account / Region**: us-east-1 (multi-AZ for fault tolerance)
+- **VPC**: Single VPC containing everything
+- **Internet Gateway**: Attached to the VPC for public internet access
+- **Public Subnets** (us-east-1a and us-east-1b): 
+  - Host the Application Load Balancer (ALB)
+  - Host EC2 instances launched by the Auto Scaling Group (simple setup; production often moves instances to private subnets)
+- **Route Tables**: 
+  - Associated with public subnets
+  - Default route (0.0.0.0/0) points to the Internet Gateway (IGW)
+- **Application Load Balancer (ALB)**: 
+  - Distributes incoming traffic across healthy instances
+  - Performs health checks
+  - Placed across both subnets for AZ redundancy
+- **Auto Scaling Group (ASG)**: 
+  - Automatically launches and terminates EC2 instances ("servers")
+  - Ensures minimum/desired/maximum capacity
+  - Spread across AZs for high availability
+- **EC2 Instances ("servers")**: 
+  - Run the monolithic application
+  - Grouped under the ASG
 
-## Key Features & Benefits
+## Design Goals & Benefits
 
-- **High Availability**: Multi-AZ deployment — if one AZ fails, traffic routes to healthy instances in the other AZ.
-- **Auto Scaling**: Automatically adds/removes EC2 instances based on demand.
-- **Elasticity**: Handles variable traffic without manual intervention.
-- **Simplicity**: Single codebase, single deployment unit — fast iteration for startups or prototypes.
-- **Cost-Effective Starter**: Minimal services (no separate DB tier yet; could use local DB or attach RDS later).
+- **High Availability**: Multi-AZ setup — if one AZ fails, the ALB routes traffic to surviving instances in the other AZ.
+- **Scalability**: ASG handles traffic spikes by adding instances automatically.
+- **Simplicity**: Everything in one tier → fast to deploy and manage for early-stage apps.
+- **Internet-Facing**: Direct public access via IGW and public subnets.
 
-## Trade-Offs & Limitations
+## Trade-Offs & Production Recommendations
 
-- **Single Point of Failure Risk**: Entire app scales or fails together (monolithic nature).
-- **Scaling Inefficiency**: Can't scale individual components (e.g., heavy DB queries affect everything).
-- **Tight Coupling**: Hard to update parts independently or adopt different tech stacks.
-- **Security**: If instances are in public subnets (as shown), they have public IPs → use private subnets + NAT Gateway in production.
-- **Evolution Path**: Good foundation — later refactor to multi-tier (add RDS, ElastiCache) or microservices.
+- **Security**: Instances in public subnets get public IPs (larger attack surface).  
+  → Recommended upgrade: Move ASG instances to private subnets + add NAT Gateway(s) for outbound internet.
+- **Monolithic Nature**: Single deployable unit → scaling/failure affects the whole app.  
+  → Future: Evolve to multi-tier (add RDS/DynamoDB) or microservices.
+- **Missing in this basic design** (easy additions):
+  - HTTPS termination + ACM certificate on ALB
+  - Health check path on instances
+  - CloudWatch monitoring & scaling policies
+  - Route 53 DNS alias to ALB
+  - AWS WAF for protection
+  - Static assets offloaded to S3 + CloudFront
 
-## How to View/Edit the Diagram
+## How to View / Edit the Diagram
 
-1. Open this repo in GitHub.
-2. Click the file: `monolithic-single-tier-design.drawio.svg`
-3. To **edit**: Go to https://app.diagrams.net → File → Open → GitHub → select this repo/file.
-   - The diagram loads fully editable (thanks to embedded XML data).
+1. Click the SVG preview above (or open the file in this repo).
+2. To edit: Go to https://app.diagrams.net → **File → Open → GitHub** → select this repository and file.
+   - Loads fully editable thanks to embedded diagram data.
 
-## Next Steps / Improvements
+## Why This Design?
 
-- Move EC2 instances to **private subnets** + add NAT Gateway(s) for outbound internet.
-- Add **Amazon RDS** (Multi-AZ) or DynamoDB for persistent data.
-- Enable **HTTPS** with AWS Certificate Manager (ACM) + ALB redirect.
-- Attach **AWS WAF** to ALB for basic protection.
-- Add **CloudFront** for caching/static content delivery.
-- Monitor with CloudWatch + set scaling alarms.
-- Explore **diagram-as-code** (e.g., Python Diagrams library) for programmatic updates.
+This is a foundational pattern for many real-world AWS web apps before adding complexity. It teaches key concepts: VPC networking, multi-AZ redundancy, load balancing, and auto-scaling — all in a minimal setup.
 
-## License
+Feel free to fork, PR improvements, or use as inspiration!
 
-MIT — feel free to use, modify, and share.
-
-Questions or suggestions? Open an issue or PR!
-
-Built with ❤️ using diagrams.net (draw.io) and AWS icons.
+Built with diagrams.net (draw.io) + AWS icons.  
+Questions? Open an issue.
